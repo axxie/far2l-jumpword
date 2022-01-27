@@ -1,0 +1,6 @@
+enum
+{
+  MJumpWord,
+  MAbove,
+  MBelow
+};
