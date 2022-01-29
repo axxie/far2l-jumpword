@@ -1,0 +1,36 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceRoot}/..",
+                "${workspaceRoot}/../far2l",
+                "${workspaceRoot}/../far2l/far2sdk",
+                "${workspaceRoot}/../WinPort",
+                "${workspaceRoot}/../utils/include/",
+                "/usr/include"
+            ],
+            "defines": [
+                "FAR_DONT_USE_INTERNALS",
+                "UNICODE",
+                "WINPORT_DIRECT",
+                "WINPORT_REGISTRY",
+                "WXUSINGDLL",
+                "_FILE_OFFSET_BITS=64",
+                "__WXGTK__"
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": "",
+                "path": [
+                    "/usr/include"
+                ]
+            },
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++14"
+        }
+    ],
+    "version": 4
+}
