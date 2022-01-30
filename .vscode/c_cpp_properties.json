@@ -17,7 +17,8 @@
                 "WINPORT_REGISTRY",
                 "WXUSINGDLL",
                 "_FILE_OFFSET_BITS=64",
-                "__WXGTK__"
+                "__WXGTK__",
+                "_DEBUG"
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,

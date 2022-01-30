@@ -21,6 +21,8 @@ set_target_properties(jumpword
     PREFIX ""
     SUFFIX ".far-plug-wide")
 
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
+  $<$<CONFIG:Debug>:_DEBUG>)
 
 add_custom_command(TARGET jumpword POST_BUILD
    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/configs

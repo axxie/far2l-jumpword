@@ -25,7 +25,8 @@ bool isIdChar(const wchar_t c) {
 }
 
 bool FindCurrentWord(
-    const wchar_t **resLine, const wchar_t **resBegin, const wchar_t **resEnd) {
+    const wchar_t **resLineBegin, const wchar_t **resLineEnd,
+    const wchar_t **resBegin, const wchar_t **resEnd) {
   EditorInfo edInfo;
   if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return false;
 
@@ -46,7 +47,8 @@ bool FindCurrentWord(
 
   if (j <= i + 1) return false;
 
-  *resLine = line;
+  *resLineBegin = line;
+  *resLineEnd = line + length;
   *resBegin = line + (i + 1);
   *resEnd = line + j;
   return true;
@@ -78,12 +80,20 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
     return (INVALID_HANDLE_VALUE);
   }
 
-  const wchar_t *line;
-  const wchar_t *begin;
-  const wchar_t *end;
-  if (!FindCurrentWord(&line, &begin, &end)) return (INVALID_HANDLE_VALUE);
-  std::wstring word(begin, end);
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%ls'\n", word.c_str());
+  const wchar_t *lineBegin;
+  const wchar_t *lineEnd;
+  const wchar_t *wordBegin;
+  const wchar_t *wordEnd;
+  if (!FindCurrentWord(&lineBegin, &lineEnd, &wordBegin, &wordEnd))
+    return (INVALID_HANDLE_VALUE);
+
+#ifdef _DEBUG
+  std::wstring line(lineBegin, lineEnd);
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%ls'\n", line.c_str());
+  std::string markers = std::string(wordBegin - lineBegin, ' ') + '^' +
+                        std::string(wordEnd - wordBegin - 1, ' ') + '^';
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%s'\n", markers.c_str());
+#endif
 
   return (INVALID_HANDLE_VALUE);
 }
