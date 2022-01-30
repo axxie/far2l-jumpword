@@ -15,8 +15,8 @@ SHAREDSYMBOL int WINAPI EXP_NAME(GetMinFarVersion)() {
 
 SHAREDSYMBOL void WINAPI
 EXP_NAME(SetStartupInfo)(const struct PluginStartupInfo *Info) {
-  ::Info = *Info;
-  ::FSF = *Info->FSF;
+  ::Info     = *Info;
+  ::FSF      = *Info->FSF;
   ::Info.FSF = &::FSF;
 }
 
@@ -25,20 +25,24 @@ bool isIdChar(const wchar_t c) {
 }
 
 bool FindCurrentWord(
-    const wchar_t **resLineBegin, const wchar_t **resLineEnd,
-    const wchar_t **resBegin, const wchar_t **resEnd) {
+    const wchar_t **resLineBegin,
+    const wchar_t **resLineEnd,
+    const wchar_t **resBegin,
+    const wchar_t **resEnd) {
   EditorInfo edInfo;
   if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return false;
 
   EditorGetString edGetString = {};
+
   edGetString.StringNumber = -1;
   if (!Info.EditorControl(ECTL_GETSTRING, &edGetString)) return false;
 
+  const wchar_t *line = edGetString.StringText;
   const size_t length = edGetString.StringLength;
+
   size_t x = edInfo.CurPos;
   if (x >= length) return false;
 
-  const wchar_t *line = edGetString.StringText;
   size_t i = x;
   while (i >= 0 && isIdChar(line[i])) i--;
 
@@ -48,15 +52,18 @@ bool FindCurrentWord(
   if (j <= i + 1) return false;
 
   *resLineBegin = line;
-  *resLineEnd = line + length;
-  *resBegin = line + (i + 1);
-  *resEnd = line + j;
+  *resLineEnd   = line + length;
+  *resBegin     = line + (i + 1);
+  *resEnd       = line + j;
   return true;
 }
 
 bool FindNextWord(
-    const wchar_t *begin, const wchar_t *end, const wchar_t *wordBegin,
-    const wchar_t *wordEnd, const wchar_t **result) {
+    const wchar_t *begin,
+    const wchar_t *end,
+    const wchar_t *wordBegin,
+    const wchar_t *wordEnd,
+    const wchar_t **result) {
   // Find the next word in the line. Two usage scenarios are possible:
   // 1. search in the lines that are below the line containing original word
   // 2. search within the line contained original word, but after the word
@@ -68,9 +75,10 @@ bool FindNextWord(
   //
   // Because of that we can safely assume that we can compare character
   // immediately.
-  bool isCheckingWord = true;
-  const wchar_t *wordCurrent = wordBegin;
+  bool isCheckingWord          = true;
+  const wchar_t *wordCurrent   = wordBegin;
   const wchar_t *foundLocation = begin;
+
   while (begin < end) {
     if (isCheckingWord && *begin == *wordCurrent) {
       wordCurrent++;
@@ -83,7 +91,7 @@ bool FindNextWord(
         isCheckingWord = false;
       } else {
         isCheckingWord = true;
-        wordCurrent = wordBegin;
+        wordCurrent    = wordBegin;
         // the word potentially starts after current character
         foundLocation = begin + 1;
       }
@@ -149,10 +157,10 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
 #endif
 
   EditorSetPosition edSetPos;
-  edSetPos.CurLine = -1;
-  edSetPos.CurTabPos = -1;
-  edSetPos.LeftPos = -1;
-  edSetPos.Overtype = -1;
+  edSetPos.CurLine       = -1;
+  edSetPos.CurTabPos     = -1;
+  edSetPos.LeftPos       = -1;
+  edSetPos.Overtype      = -1;
   edSetPos.TopScreenLine = -1;
 
   edSetPos.CurPos = foundWord - lineBegin;
@@ -162,13 +170,13 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
 }
 
 SHAREDSYMBOL void WINAPI EXP_NAME(GetPluginInfo)(struct PluginInfo *Info) {
-  Info->StructSize = sizeof(*Info);
-  Info->Flags = PF_EDITOR | PF_DISABLEPANELS;
+  Info->StructSize            = sizeof(*Info);
+  Info->Flags                 = PF_EDITOR | PF_DISABLEPANELS;
   Info->DiskMenuStringsNumber = 0;
 
   static const TCHAR *PluginMenuStrings[1];
-  PluginMenuStrings[0] = GetMsg(MJumpWord);
-  Info->PluginMenuStrings = PluginMenuStrings;
-  Info->PluginMenuStringsNumber = ARRAYSIZE(PluginMenuStrings);
+  PluginMenuStrings[0]            = GetMsg(MJumpWord);
+  Info->PluginMenuStrings         = PluginMenuStrings;
+  Info->PluginMenuStringsNumber   = ARRAYSIZE(PluginMenuStrings);
   Info->PluginConfigStringsNumber = 0;
 }

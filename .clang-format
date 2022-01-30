@@ -3,5 +3,7 @@
     "AllowShortIfStatementsOnASingleLine": "true",
     "AlignAfterOpenBracket": "AlwaysBreak",
     "AllowShortLoopsOnASingleLine": "true",
-    "AllowShortFunctionsOnASingleLine": "false"
+    "AllowShortFunctionsOnASingleLine": "false",
+    "AlignConsecutiveAssignments": "Consecutive",
+    "BinPackParameters": "false"
 }
