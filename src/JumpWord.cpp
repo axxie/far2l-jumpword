@@ -99,6 +99,36 @@ bool FindNextWord(
   return false;
 }
 
+bool FindPreviousWord(
+    const wchar_t *begin,
+    const wchar_t *end,
+    const wchar_t *wordBegin,
+    const wchar_t *wordEnd,
+    const wchar_t **result) {
+
+  bool isCheckingWord        = true;
+  const wchar_t *wordCurrent = wordEnd - 1;
+
+  while (begin <= end) {
+    if (isCheckingWord && *end == *wordCurrent) {
+      if (wordCurrent == wordBegin) {
+        *result = end;
+        return true;
+      }
+      wordCurrent--;
+    } else {
+      if (isIdChar(*end)) {
+        isCheckingWord = false;
+      } else {
+        isCheckingWord = true;
+        wordCurrent    = wordEnd - 1;
+      }
+    }
+    end--;
+  }
+  return false;
+}
+
 void GotoPosition(int x, int y) {
   EditorSetPosition edSetPos;
   edSetPos.CurTabPos     = -1;
@@ -136,6 +166,8 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
     return (INVALID_HANDLE_VALUE);
   }
 
+  bool isSearchingAbove = selectedItem == 0;
+
   EditorInfo edInfo;
   if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return (INVALID_HANDLE_VALUE);
 
@@ -156,38 +188,66 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
 #endif
 
   int currentLine            = edInfo.CurLine;
-  const wchar_t *startSearch = wordEnd + 1;
+  const wchar_t *searchBreak = isSearchingAbove ? wordBegin : wordEnd + 1;
 
-  while (currentLine < edInfo.TotalLines) {
+  while (currentLine < edInfo.TotalLines && currentLine >= 0) {
 
-    // If the word is found at the end of line, there is no need to search it
-    // again in the same line
-    if (currentLine != edInfo.CurLine || wordEnd < lineEnd) {
-      const wchar_t *foundWord;
-      if (FindNextWord(startSearch, lineEnd, wordBegin, wordEnd, &foundWord)) {
+    if (isSearchingAbove) {
+      // If the word is found at the start of line, there is no need to search
+      // it again in the same line
+      if (currentLine != edInfo.CurLine || wordBegin > lineBegin) {
+        const wchar_t *foundWord;
+        if (FindPreviousWord(
+                lineBegin, searchBreak, wordBegin, wordEnd, &foundWord)) {
 #ifdef _DEBUG
-        std::wstring line(lineBegin, lineEnd);
-        fprintf(
-            stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
-        markers = std::string(foundWord - lineBegin, ' ') + '^';
-        fprintf(
-            stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n", markers.c_str());
+          std::wstring line(lineBegin, lineEnd);
+          fprintf(
+              stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+          markers = std::string(foundWord - lineBegin, ' ') + '^';
+          fprintf(
+              stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n",
+              markers.c_str());
 #endif
-        GotoPosition(foundWord - lineBegin, currentLine);
-        return (INVALID_HANDLE_VALUE);
+          GotoPosition(foundWord - lineBegin, currentLine);
+          return (INVALID_HANDLE_VALUE);
+        }
+      }
+    } else {
+      // If the word is found at the end of line, there is no need to search it
+      // again in the same line
+      if (currentLine != edInfo.CurLine || wordEnd < lineEnd) {
+        const wchar_t *foundWord;
+        if (FindNextWord(
+                searchBreak, lineEnd, wordBegin, wordEnd, &foundWord)) {
+#ifdef _DEBUG
+          std::wstring line(lineBegin, lineEnd);
+          fprintf(
+              stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+          markers = std::string(foundWord - lineBegin, ' ') + '^';
+          fprintf(
+              stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n",
+              markers.c_str());
+#endif
+          GotoPosition(foundWord - lineBegin, currentLine);
+          return (INVALID_HANDLE_VALUE);
+        }
       }
     }
 
-    currentLine++;
+    if (isSearchingAbove) {
+      currentLine--;
+    } else {
+      currentLine++;
+    }
 
     EditorGetString edGetString = {};
 
     edGetString.StringNumber = currentLine;
     if (!Info.EditorControl(ECTL_GETSTRING, &edGetString))
       return (INVALID_HANDLE_VALUE);
-    lineEnd     = edGetString.StringText + edGetString.StringLength;
     lineBegin   = edGetString.StringText;
-    startSearch = lineBegin;
+    lineEnd     = edGetString.StringText + edGetString.StringLength;
+    searchBreak = isSearchingAbove ? lineEnd : lineBegin;
   }
 
   return (INVALID_HANDLE_VALUE);
