@@ -25,12 +25,11 @@ bool isIdChar(const wchar_t c) {
 }
 
 bool FindCurrentWord(
+    int startPosition,
     const wchar_t **resLineBegin,
     const wchar_t **resLineEnd,
     const wchar_t **resBegin,
     const wchar_t **resEnd) {
-  EditorInfo edInfo;
-  if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return false;
 
   EditorGetString edGetString = {};
 
@@ -38,15 +37,14 @@ bool FindCurrentWord(
   if (!Info.EditorControl(ECTL_GETSTRING, &edGetString)) return false;
 
   const wchar_t *line = edGetString.StringText;
-  const size_t length = edGetString.StringLength;
+  const int length    = edGetString.StringLength;
 
-  size_t x = edInfo.CurPos;
-  if (x >= length) return false;
+  if (startPosition >= length) return false;
 
-  size_t i = x;
+  int i = startPosition;
   while (i >= 0 && isIdChar(line[i])) i--;
 
-  size_t j = x;
+  int j = startPosition;
   while (j < length && isIdChar(line[j])) j++;
 
   if (j <= i + 1) return false;
@@ -101,6 +99,17 @@ bool FindNextWord(
   return false;
 }
 
+void GotoPosition(int x, int y) {
+  EditorSetPosition edSetPos;
+  edSetPos.CurTabPos     = -1;
+  edSetPos.LeftPos       = -1;
+  edSetPos.Overtype      = -1;
+  edSetPos.TopScreenLine = -1;
+  edSetPos.CurPos        = x;
+  edSetPos.CurLine       = y;
+  Info.EditorControl(ECTL_SETPOSITION, &edSetPos);
+}
+
 SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   int menuTexts[] = {MAbove, MBelow};
 
@@ -127,11 +136,15 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
     return (INVALID_HANDLE_VALUE);
   }
 
+  EditorInfo edInfo;
+  if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return (INVALID_HANDLE_VALUE);
+
   const wchar_t *lineBegin;
   const wchar_t *lineEnd;
   const wchar_t *wordBegin;
   const wchar_t *wordEnd;
-  if (!FindCurrentWord(&lineBegin, &lineEnd, &wordBegin, &wordEnd))
+  if (!FindCurrentWord(
+          edInfo.CurPos, &lineBegin, &lineEnd, &wordBegin, &wordEnd))
     return (INVALID_HANDLE_VALUE);
 
 #ifdef _DEBUG
@@ -139,32 +152,43 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
   std::string markers = std::string(wordBegin - lineBegin, ' ') + '[' +
                         std::string(wordEnd - wordBegin - 1, ' ') + ')';
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m word:  '%s'\n", markers.c_str());
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m word:   %s \n", markers.c_str());
 #endif
 
-  // If the word is found at the end of line, there is no need to search it
-  // again in the same line
-  if (wordEnd >= lineEnd) return (INVALID_HANDLE_VALUE);
+  int currentLine            = edInfo.CurLine;
+  const wchar_t *startSearch = wordEnd + 1;
 
-  const wchar_t *foundWord;
-  if (!FindNextWord(wordEnd + 1, lineEnd, wordBegin, wordEnd, &foundWord))
-    return (INVALID_HANDLE_VALUE);
+  while (currentLine < edInfo.TotalLines) {
 
+    // If the word is found at the end of line, there is no need to search it
+    // again in the same line
+    if (currentLine != edInfo.CurLine || wordEnd < lineEnd) {
+      const wchar_t *foundWord;
+      if (FindNextWord(startSearch, lineEnd, wordBegin, wordEnd, &foundWord)) {
 #ifdef _DEBUG
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
-  markers = std::string(foundWord - lineBegin, ' ') + '^';
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m found: '%s'\n", markers.c_str());
+        std::wstring line(lineBegin, lineEnd);
+        fprintf(
+            stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+        markers = std::string(foundWord - lineBegin, ' ') + '^';
+        fprintf(
+            stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n", markers.c_str());
 #endif
+        GotoPosition(foundWord - lineBegin, currentLine);
+        return (INVALID_HANDLE_VALUE);
+      }
+    }
 
-  EditorSetPosition edSetPos;
-  edSetPos.CurLine       = -1;
-  edSetPos.CurTabPos     = -1;
-  edSetPos.LeftPos       = -1;
-  edSetPos.Overtype      = -1;
-  edSetPos.TopScreenLine = -1;
+    currentLine++;
 
-  edSetPos.CurPos = foundWord - lineBegin;
-  Info.EditorControl(ECTL_SETPOSITION, &edSetPos);
+    EditorGetString edGetString = {};
+
+    edGetString.StringNumber = currentLine;
+    if (!Info.EditorControl(ECTL_GETSTRING, &edGetString))
+      return (INVALID_HANDLE_VALUE);
+    lineEnd     = edGetString.StringText + edGetString.StringLength;
+    lineBegin   = edGetString.StringText;
+    startSearch = lineBegin;
+  }
 
   return (INVALID_HANDLE_VALUE);
 }
