@@ -24,17 +24,18 @@ bool isIdChar(const wchar_t c) {
   return c == L'_' || FSF.LIsAlphanum(c);
 }
 
-std::wstring FindCurrentWord() {
+bool FindCurrentWord(
+    const wchar_t **resLine, const wchar_t **resBegin, const wchar_t **resEnd) {
   EditorInfo edInfo;
-  if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return L"";
+  if (!Info.EditorControl(ECTL_GETINFO, &edInfo)) return false;
 
   EditorGetString edGetString = {};
   edGetString.StringNumber = -1;
-  if (!Info.EditorControl(ECTL_GETSTRING, &edGetString)) return L"";
+  if (!Info.EditorControl(ECTL_GETSTRING, &edGetString)) return false;
 
   const size_t length = edGetString.StringLength;
   size_t x = edInfo.CurPos;
-  if (x >= length) return L"";
+  if (x >= length) return false;
 
   const wchar_t *line = edGetString.StringText;
   size_t i = x;
@@ -43,9 +44,12 @@ std::wstring FindCurrentWord() {
   size_t j = x;
   while (j < length && isIdChar(line[j])) j++;
 
-  if (j <= i + 1) return L"";
+  if (j <= i + 1) return false;
 
-  return std::wstring(line + i + 1, line + j);
+  *resLine = line;
+  *resBegin = line + (i + 1);
+  *resEnd = line + j;
+  return true;
 }
 
 SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
@@ -74,8 +78,12 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
     return (INVALID_HANDLE_VALUE);
   }
 
-  std::wstring res = FindCurrentWord();
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%S'\n", res.c_str());
+  const wchar_t *line;
+  const wchar_t *begin;
+  const wchar_t *end;
+  if (!FindCurrentWord(&line, &begin, &end)) return (INVALID_HANDLE_VALUE);
+  std::wstring word(begin, end);
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%ls'\n", word.c_str());
 
   return (INVALID_HANDLE_VALUE);
 }
