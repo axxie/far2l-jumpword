@@ -54,6 +54,45 @@ bool FindCurrentWord(
   return true;
 }
 
+bool FindNextWord(
+    const wchar_t *begin, const wchar_t *end, const wchar_t *wordBegin,
+    const wchar_t *wordEnd, const wchar_t **result) {
+  // Find the next word in the line. Two usage scenarios are possible:
+  // 1. search in the lines that are below the line containing original word
+  // 2. search within the line contained original word, but after the word
+  // itself
+  //
+  // Based on the supported search scenarios, begin is guaranteed to either
+  // point to the start of the line or to point to the element that is
+  // immediately after the element delimiting the word being searched.
+  //
+  // Because of that we can safely assume that we can compare character
+  // immediately.
+  bool isCheckingWord = true;
+  const wchar_t *wordCurrent = wordBegin;
+  const wchar_t *foundLocation = begin;
+  while (begin < end) {
+    if (isCheckingWord && *begin == *wordCurrent) {
+      wordCurrent++;
+      if (wordCurrent == wordEnd) {
+        *result = foundLocation;
+        return true;
+      }
+    } else {
+      if (isIdChar(*begin)) {
+        isCheckingWord = false;
+      } else {
+        isCheckingWord = true;
+        wordCurrent = wordBegin;
+        // the word potentially starts after current character
+        foundLocation = begin + 1;
+      }
+    }
+    begin++;
+  }
+  return false;
+}
+
 SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   int menuTexts[] = {MAbove, MBelow};
 
@@ -89,11 +128,35 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
 
 #ifdef _DEBUG
   std::wstring line(lineBegin, lineEnd);
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%ls'\n", line.c_str());
-  std::string markers = std::string(wordBegin - lineBegin, ' ') + '^' +
-                        std::string(wordEnd - wordBegin - 1, ' ') + '^';
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m '%s'\n", markers.c_str());
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+  std::string markers = std::string(wordBegin - lineBegin, ' ') + '[' +
+                        std::string(wordEnd - wordBegin - 1, ' ') + ')';
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m word:  '%s'\n", markers.c_str());
 #endif
+
+  // If the word is found at the end of line, there is no need to search it
+  // again in the same line
+  if (wordEnd >= lineEnd) return (INVALID_HANDLE_VALUE);
+
+  const wchar_t *foundWord;
+  if (!FindNextWord(wordEnd + 1, lineEnd, wordBegin, wordEnd, &foundWord))
+    return (INVALID_HANDLE_VALUE);
+
+#ifdef _DEBUG
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+  markers = std::string(foundWord - lineBegin, ' ') + '^';
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m found: '%s'\n", markers.c_str());
+#endif
+
+  EditorSetPosition edSetPos;
+  edSetPos.CurLine = -1;
+  edSetPos.CurTabPos = -1;
+  edSetPos.LeftPos = -1;
+  edSetPos.Overtype = -1;
+  edSetPos.TopScreenLine = -1;
+
+  edSetPos.CurPos = foundWord - lineBegin;
+  Info.EditorControl(ECTL_SETPOSITION, &edSetPos);
 
   return (INVALID_HANDLE_VALUE);
 }
@@ -102,6 +165,7 @@ SHAREDSYMBOL void WINAPI EXP_NAME(GetPluginInfo)(struct PluginInfo *Info) {
   Info->StructSize = sizeof(*Info);
   Info->Flags = PF_EDITOR | PF_DISABLEPANELS;
   Info->DiskMenuStringsNumber = 0;
+
   static const TCHAR *PluginMenuStrings[1];
   PluginMenuStrings[0] = GetMsg(MJumpWord);
   Info->PluginMenuStrings = PluginMenuStrings;
