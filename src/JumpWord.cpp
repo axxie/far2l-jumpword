@@ -68,6 +68,52 @@ void LogFoundWord(
 #endif
 }
 
+const int minLinesToShowUI = 1000;
+const DWORD delayInitial =
+    200; // 0.5 seconds before showing the progress message
+const DWORD delayUpdates =
+    50; // after the progress is shown it is updated every 0.2 seconds
+
+DWORD nextUpdate;
+
+void UIInit() {
+  nextUpdate = GetTickCount() + delayInitial;
+  Info.EditorControl(ECTL_REDRAW, NULL);
+}
+
+void UIUpdate(int currentLine, int totalLines) {
+
+  if (totalLines < minLinesToShowUI) return;
+
+  DWORD currentTime = GetTickCount();
+  if (currentTime < nextUpdate) return;
+  nextUpdate = currentTime + delayUpdates;
+
+  int percent = currentLine * 100 / totalLines;
+  wchar_t percentString[20];
+  if (-1 ==
+      swprintf(percentString, ARRAYSIZE(percentString), L" %3d%%", percent)) {
+    return;
+  }
+
+  const wchar_t *searchingMessage = GetMsg(MSearching);
+
+  // Reserve the progress width to make the two lines in the message aligned by
+  // width
+  int progressWidth  = wcslen(searchingMessage) - wcslen(percentString);
+  int progressFilled = percent * progressWidth / 100;
+
+  std::wstring progressLine =
+      std::wstring(progressFilled, FSF.BoxSymbols[BS_X_DB]) +
+      std::wstring(progressWidth - progressFilled, FSF.BoxSymbols[BS_X_B0]) +
+      percentString;
+
+  const wchar_t *const items[] = {
+      GetMsg(MJumpWord), searchingMessage, progressLine.c_str()};
+
+  Info.Message(Info.ModuleNumber, 0, NULL, items, ARRAYSIZE(items), 0);
+}
+
 bool GetLine(
     int currentLine, const wchar_t **lineBegin, const wchar_t **lineEnd) {
 
@@ -155,6 +201,8 @@ bool FindWordBelow(
 
     if (!GetLine(currentLine, &lineBegin, &lineEnd)) return false;
     searchStart = lineBegin;
+
+    UIUpdate(currentLine, totalLines);
   }
 
   return false;
@@ -234,6 +282,8 @@ bool FindWordAbove(
 
     if (!GetLine(currentLine, &lineBegin, &lineEnd)) return false;
     searchEnd = lineEnd;
+
+    UIUpdate(totalLines - 1 - currentLine, totalLines);
   }
 
   return false;
@@ -262,15 +312,15 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
 
   int selectedItem = Info.Menu(
       Info.ModuleNumber,
-      -1,                // X, -1 - auto
-      -1,                // Y, -1 - auto
-      0,                 // MaxHeight, 0 - maximum
-      FMENU_WRAPMODE,    // Flags
-      GetMsg(MJumpWord), // Title
-      nullptr,           // Bottom
-      nullptr,           // HelpTopic
-      nullptr,           // BreakKeys
-      nullptr,           // BreakCode
+      -1,                    // X, -1 - auto
+      -1,                    // Y, -1 - auto
+      0,                     // MaxHeight, 0 - maximum
+      FMENU_WRAPMODE,        // Flags
+      GetMsg(MJumpWordMenu), // Title
+      nullptr,               // Bottom
+      nullptr,               // HelpTopic
+      nullptr,               // BreakKeys
+      nullptr,               // BreakCode
       menuItems, ARRAYSIZE(menuItems));
   if (selectedItem == -1) {
     return (INVALID_HANDLE_VALUE);
@@ -296,6 +346,8 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
                         std::string(wordEnd - wordBegin - 1, ' ') + ')';
   fprintf(stderr, "\033[0;31mJUMPWORD:\033[m word:   %s \n", markers.c_str());
 #endif
+
+  UIInit();
 
   int foundPosition, foundLine;
   if (isSearchingAbove) {

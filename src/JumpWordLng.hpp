@@ -1,6 +1,1 @@
-enum
-{
-  MJumpWord,
-  MAbove,
-  MBelow
-};
+enum { MJumpWordMenu, MAbove, MBelow, MJumpWord, MSearching };
