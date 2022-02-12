@@ -140,6 +140,18 @@ void GotoPosition(int x, int y) {
   Info.EditorControl(ECTL_SETPOSITION, &edSetPos);
 }
 
+void LogFoundWord(
+    const wchar_t *lineBegin,
+    const wchar_t *lineEnd,
+    const wchar_t *foundWord) {
+#ifdef _DEBUG
+  std::wstring line(lineBegin, lineEnd);
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+  std::string markers = std::string(foundWord - lineBegin, ' ') + '^';
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n", markers.c_str());
+#endif
+}
+
 SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   int menuTexts[] = {MAbove, MBelow};
 
@@ -199,15 +211,7 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
         const wchar_t *foundWord;
         if (FindPreviousWord(
                 lineBegin, searchBreak, wordBegin, wordEnd, &foundWord)) {
-#ifdef _DEBUG
-          std::wstring line(lineBegin, lineEnd);
-          fprintf(
-              stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
-          markers = std::string(foundWord - lineBegin, ' ') + '^';
-          fprintf(
-              stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n",
-              markers.c_str());
-#endif
+          LogFoundWord(lineBegin, lineEnd, foundWord);
           GotoPosition(foundWord - lineBegin, currentLine);
           return (INVALID_HANDLE_VALUE);
         }
@@ -219,15 +223,7 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
         const wchar_t *foundWord;
         if (FindNextWord(
                 searchBreak, lineEnd, wordBegin, wordEnd, &foundWord)) {
-#ifdef _DEBUG
-          std::wstring line(lineBegin, lineEnd);
-          fprintf(
-              stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
-          markers = std::string(foundWord - lineBegin, ' ') + '^';
-          fprintf(
-              stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n",
-              markers.c_str());
-#endif
+          LogFoundWord(lineBegin, lineEnd, foundWord);
           GotoPosition(foundWord - lineBegin, currentLine);
           return (INVALID_HANDLE_VALUE);
         }
