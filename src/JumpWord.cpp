@@ -13,8 +13,7 @@ SHAREDSYMBOL int WINAPI EXP_NAME(GetMinFarVersion)() {
   return FARMANAGERVERSION;
 }
 
-SHAREDSYMBOL void WINAPI
-EXP_NAME(SetStartupInfo)(const struct PluginStartupInfo *Info) {
+SHAREDSYMBOL void WINAPI EXP_NAME(SetStartupInfo)(const struct PluginStartupInfo *Info) {
   ::Info     = *Info;
   ::FSF      = *Info->FSF;
   ::Info.FSF = &::FSF;
@@ -56,10 +55,7 @@ bool FindCurrentWord(
   return true;
 }
 
-void LogFoundWord(
-    const wchar_t *lineBegin,
-    const wchar_t *lineEnd,
-    const wchar_t *foundWord) {
+void LogFoundWord(const wchar_t *lineBegin, const wchar_t *lineEnd, const wchar_t *foundWord) {
 #ifdef _DEBUG
   std::wstring line(lineBegin, lineEnd);
   fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
@@ -69,10 +65,8 @@ void LogFoundWord(
 }
 
 const int minLinesToShowUI = 1000;
-const DWORD delayInitial =
-    200; // 0.5 seconds before showing the progress message
-const DWORD delayUpdates =
-    50; // after the progress is shown it is updated every 0.2 seconds
+const DWORD delayInitial   = 200; // 0.5 seconds before showing the progress message
+const DWORD delayUpdates   = 50;  // after the progress is shown it is updated every 0.2 seconds
 
 DWORD nextUpdate;
 
@@ -91,8 +85,7 @@ void UIUpdate(int currentLine, int totalLines) {
 
   int percent = currentLine * 100 / totalLines;
   wchar_t percentString[20];
-  if (-1 ==
-      swprintf(percentString, ARRAYSIZE(percentString), L" %3d%%", percent)) {
+  if (-1 == swprintf(percentString, ARRAYSIZE(percentString), L" %3d%%", percent)) {
     return;
   }
 
@@ -105,17 +98,14 @@ void UIUpdate(int currentLine, int totalLines) {
 
   std::wstring progressLine =
       std::wstring(progressFilled, FSF.BoxSymbols[BS_X_DB]) +
-      std::wstring(progressWidth - progressFilled, FSF.BoxSymbols[BS_X_B0]) +
-      percentString;
+      std::wstring(progressWidth - progressFilled, FSF.BoxSymbols[BS_X_B0]) + percentString;
 
-  const wchar_t *const items[] = {
-      GetMsg(MJumpWord), searchingMessage, progressLine.c_str()};
+  const wchar_t *const items[] = {GetMsg(MJumpWord), searchingMessage, progressLine.c_str()};
 
   Info.Message(Info.ModuleNumber, 0, NULL, items, ARRAYSIZE(items), 0);
 }
 
-bool GetLine(
-    int currentLine, const wchar_t **lineBegin, const wchar_t **lineEnd) {
+bool GetLine(int currentLine, const wchar_t **lineBegin, const wchar_t **lineEnd) {
 
   EditorGetString edGetString = {};
   edGetString.StringNumber    = currentLine;
@@ -270,8 +260,7 @@ bool FindWordAbove(
     // it again in the same line
     if (currentLine != searchStartLine || wordBegin > lineBegin) {
       const wchar_t *foundWord;
-      if (FindPreviousWord(
-              lineBegin, searchEnd, wordBegin, wordEnd, &foundWord)) {
+      if (FindPreviousWord(lineBegin, searchEnd, wordBegin, wordEnd, &foundWord)) {
         LogFoundWord(lineBegin, lineEnd, foundWord);
         *foundPosition = foundWord - lineBegin;
         *foundLine     = currentLine;
@@ -321,7 +310,8 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
       nullptr,               // HelpTopic
       nullptr,               // BreakKeys
       nullptr,               // BreakCode
-      menuItems, ARRAYSIZE(menuItems));
+      menuItems,
+      ARRAYSIZE(menuItems));
   if (selectedItem == -1) {
     return (INVALID_HANDLE_VALUE);
   }
@@ -335,8 +325,7 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   const wchar_t *lineEnd;
   const wchar_t *wordBegin;
   const wchar_t *wordEnd;
-  if (!FindCurrentWord(
-          edInfo.CurPos, &lineBegin, &lineEnd, &wordBegin, &wordEnd))
+  if (!FindCurrentWord(edInfo.CurPos, &lineBegin, &lineEnd, &wordBegin, &wordEnd))
     return (INVALID_HANDLE_VALUE);
 
 #ifdef _DEBUG
@@ -352,14 +341,26 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   int foundPosition, foundLine;
   if (isSearchingAbove) {
     if (!FindWordAbove(
-            edInfo.CurLine, edInfo.TotalLines, lineBegin, lineEnd, wordBegin,
-            wordEnd, &foundPosition, &foundLine)) {
+            edInfo.CurLine,
+            edInfo.TotalLines,
+            lineBegin,
+            lineEnd,
+            wordBegin,
+            wordEnd,
+            &foundPosition,
+            &foundLine)) {
       return (INVALID_HANDLE_VALUE);
     }
   } else {
     if (!FindWordBelow(
-            edInfo.CurLine, edInfo.TotalLines, lineBegin, lineEnd, wordBegin,
-            wordEnd, &foundPosition, &foundLine)) {
+            edInfo.CurLine,
+            edInfo.TotalLines,
+            lineBegin,
+            lineEnd,
+            wordBegin,
+            wordEnd,
+            &foundPosition,
+            &foundLine)) {
       return (INVALID_HANDLE_VALUE);
     }
   }
