@@ -56,6 +56,31 @@ bool FindCurrentWord(
   return true;
 }
 
+void LogFoundWord(
+    const wchar_t *lineBegin,
+    const wchar_t *lineEnd,
+    const wchar_t *foundWord) {
+#ifdef _DEBUG
+  std::wstring line(lineBegin, lineEnd);
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
+  std::string markers = std::string(foundWord - lineBegin, ' ') + '^';
+  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n", markers.c_str());
+#endif
+}
+
+bool GetLine(
+    int currentLine, const wchar_t **lineBegin, const wchar_t **lineEnd) {
+
+  EditorGetString edGetString = {};
+  edGetString.StringNumber    = currentLine;
+
+  if (!Info.EditorControl(ECTL_GETSTRING, &edGetString)) return false;
+
+  *lineBegin = edGetString.StringText;
+  *lineEnd   = edGetString.StringText + edGetString.StringLength;
+  return true;
+}
+
 bool FindNextWord(
     const wchar_t *begin,
     const wchar_t *end,
@@ -99,13 +124,59 @@ bool FindNextWord(
   return false;
 }
 
+bool FindWordBelow(
+    int searchStartLine,
+    int totalLines,
+    const wchar_t *lineBegin,
+    const wchar_t *lineEnd,
+    const wchar_t *wordBegin,
+    const wchar_t *wordEnd,
+    int *foundPosition,
+    int *foundLine) {
+
+  int currentLine = searchStartLine;
+  // The search starts after the original word on the same line
+  const wchar_t *searchStart = wordEnd + 1;
+
+  while (currentLine < totalLines) {
+
+    // If the word is found at the end of line, there is no need to search it
+    // again in the same line
+    if (currentLine != searchStartLine || wordEnd < lineEnd) {
+      const wchar_t *foundWord;
+      if (FindNextWord(searchStart, lineEnd, wordBegin, wordEnd, &foundWord)) {
+        LogFoundWord(lineBegin, lineEnd, foundWord);
+        *foundPosition = foundWord - lineBegin;
+        *foundLine     = currentLine;
+        return true;
+      }
+    }
+    currentLine++;
+
+    if (!GetLine(currentLine, &lineBegin, &lineEnd)) return false;
+    searchStart = lineBegin;
+  }
+
+  return false;
+}
+
 bool FindPreviousWord(
     const wchar_t *begin,
     const wchar_t *end,
     const wchar_t *wordBegin,
     const wchar_t *wordEnd,
     const wchar_t **result) {
-
+  // Find the previous word in the line. Two usage scenarios are possible:
+  // 1. search in the lines that are above the line containing original word
+  // 2. search within the line contained original word, but before the word
+  // itself
+  //
+  // Based on the supported search scenarios, end is guaranteed to either
+  // point to the end of the line or to point to the first element of the
+  // original word
+  //
+  // Because of that we can safely assume that we can compare character
+  // immediately.
   bool isCheckingWord        = true;
   const wchar_t *wordCurrent = wordEnd - 1;
 
@@ -129,6 +200,45 @@ bool FindPreviousWord(
   return false;
 }
 
+bool FindWordAbove(
+    int searchStartLine,
+    int totalLines,
+    const wchar_t *lineBegin,
+    const wchar_t *lineEnd,
+    const wchar_t *wordBegin,
+    const wchar_t *wordEnd,
+    int *foundPosition,
+    int *foundLine) {
+
+  int currentLine = searchStartLine;
+  // The search starts before the original word on the same line.
+  // Since the search is going backward, the end pointer defines the starting
+  // point for the search.
+  const wchar_t *searchEnd = wordBegin;
+
+  while (currentLine >= 0) {
+
+    // If the word is found at the start of line, there is no need to search
+    // it again in the same line
+    if (currentLine != searchStartLine || wordBegin > lineBegin) {
+      const wchar_t *foundWord;
+      if (FindPreviousWord(
+              lineBegin, searchEnd, wordBegin, wordEnd, &foundWord)) {
+        LogFoundWord(lineBegin, lineEnd, foundWord);
+        *foundPosition = foundWord - lineBegin;
+        *foundLine     = currentLine;
+        return true;
+      }
+    }
+    currentLine--;
+
+    if (!GetLine(currentLine, &lineBegin, &lineEnd)) return false;
+    searchEnd = lineEnd;
+  }
+
+  return false;
+}
+
 void GotoPosition(int x, int y) {
   EditorSetPosition edSetPos;
   edSetPos.CurTabPos     = -1;
@@ -138,18 +248,6 @@ void GotoPosition(int x, int y) {
   edSetPos.CurPos        = x;
   edSetPos.CurLine       = y;
   Info.EditorControl(ECTL_SETPOSITION, &edSetPos);
-}
-
-void LogFoundWord(
-    const wchar_t *lineBegin,
-    const wchar_t *lineEnd,
-    const wchar_t *foundWord) {
-#ifdef _DEBUG
-  std::wstring line(lineBegin, lineEnd);
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m line:  '%ls'\n", line.c_str());
-  std::string markers = std::string(foundWord - lineBegin, ' ') + '^';
-  fprintf(stderr, "\033[0;31mJUMPWORD:\033[m found:  %s \n", markers.c_str());
-#endif
 }
 
 SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
@@ -199,52 +297,21 @@ SHAREDSYMBOL HANDLE WINAPI EXP_NAME(OpenPlugin)(int OpenFrom, INT_PTR Item) {
   fprintf(stderr, "\033[0;31mJUMPWORD:\033[m word:   %s \n", markers.c_str());
 #endif
 
-  int currentLine            = edInfo.CurLine;
-  const wchar_t *searchBreak = isSearchingAbove ? wordBegin : wordEnd + 1;
-
-  while (currentLine < edInfo.TotalLines && currentLine >= 0) {
-
-    if (isSearchingAbove) {
-      // If the word is found at the start of line, there is no need to search
-      // it again in the same line
-      if (currentLine != edInfo.CurLine || wordBegin > lineBegin) {
-        const wchar_t *foundWord;
-        if (FindPreviousWord(
-                lineBegin, searchBreak, wordBegin, wordEnd, &foundWord)) {
-          LogFoundWord(lineBegin, lineEnd, foundWord);
-          GotoPosition(foundWord - lineBegin, currentLine);
-          return (INVALID_HANDLE_VALUE);
-        }
-      }
-    } else {
-      // If the word is found at the end of line, there is no need to search it
-      // again in the same line
-      if (currentLine != edInfo.CurLine || wordEnd < lineEnd) {
-        const wchar_t *foundWord;
-        if (FindNextWord(
-                searchBreak, lineEnd, wordBegin, wordEnd, &foundWord)) {
-          LogFoundWord(lineBegin, lineEnd, foundWord);
-          GotoPosition(foundWord - lineBegin, currentLine);
-          return (INVALID_HANDLE_VALUE);
-        }
-      }
-    }
-
-    if (isSearchingAbove) {
-      currentLine--;
-    } else {
-      currentLine++;
-    }
-
-    EditorGetString edGetString = {};
-
-    edGetString.StringNumber = currentLine;
-    if (!Info.EditorControl(ECTL_GETSTRING, &edGetString))
+  int foundPosition, foundLine;
+  if (isSearchingAbove) {
+    if (!FindWordAbove(
+            edInfo.CurLine, edInfo.TotalLines, lineBegin, lineEnd, wordBegin,
+            wordEnd, &foundPosition, &foundLine)) {
       return (INVALID_HANDLE_VALUE);
-    lineBegin   = edGetString.StringText;
-    lineEnd     = edGetString.StringText + edGetString.StringLength;
-    searchBreak = isSearchingAbove ? lineEnd : lineBegin;
+    }
+  } else {
+    if (!FindWordBelow(
+            edInfo.CurLine, edInfo.TotalLines, lineBegin, lineEnd, wordBegin,
+            wordEnd, &foundPosition, &foundLine)) {
+      return (INVALID_HANDLE_VALUE);
+    }
   }
+  GotoPosition(foundPosition, foundLine);
 
   return (INVALID_HANDLE_VALUE);
 }
