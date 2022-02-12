@@ -64,6 +64,26 @@ void LogFoundWord(const wchar_t *lineBegin, const wchar_t *lineEnd, const wchar_
 #endif
 }
 
+bool CheckForEsc() {
+  DWORD countRead;
+  INPUT_RECORD inputRecord;
+  bool result = false;
+
+  while (true) {
+    PeekConsoleInput(NULL, &inputRecord, 1, &countRead);
+    if (countRead == 0) break;
+
+    ReadConsoleInput(NULL, &inputRecord, 1, &countRead);
+
+    if (inputRecord.EventType != KEY_EVENT) continue;
+    if (!inputRecord.Event.KeyEvent.bKeyDown) continue;
+    if (inputRecord.Event.KeyEvent.wVirtualKeyCode != VK_ESCAPE) continue;
+
+    result = true;
+  }
+  return result;
+}
+
 const int minLinesToShowUI = 1000;
 const DWORD delayInitial   = 200; // 0.5 seconds before showing the progress message
 const DWORD delayUpdates   = 50;  // after the progress is shown it is updated every 0.2 seconds
@@ -75,18 +95,18 @@ void UIInit() {
   Info.EditorControl(ECTL_REDRAW, NULL);
 }
 
-void UIUpdate(int currentLine, int totalLines) {
+bool UIUpdate(int currentLine, int totalLines) {
 
-  if (totalLines < minLinesToShowUI) return;
+  if (totalLines < minLinesToShowUI) return true;
 
   DWORD currentTime = GetTickCount();
-  if (currentTime < nextUpdate) return;
+  if (currentTime < nextUpdate) return true;
   nextUpdate = currentTime + delayUpdates;
 
   int percent = currentLine * 100 / totalLines;
   wchar_t percentString[20];
   if (-1 == swprintf(percentString, ARRAYSIZE(percentString), L" %3d%%", percent)) {
-    return;
+    return true;
   }
 
   const wchar_t *searchingMessage = GetMsg(MSearching);
@@ -103,6 +123,8 @@ void UIUpdate(int currentLine, int totalLines) {
   const wchar_t *const items[] = {GetMsg(MJumpWord), searchingMessage, progressLine.c_str()};
 
   Info.Message(Info.ModuleNumber, 0, NULL, items, ARRAYSIZE(items), 0);
+
+  return !CheckForEsc();
 }
 
 bool GetLine(int currentLine, const wchar_t **lineBegin, const wchar_t **lineEnd) {
@@ -192,7 +214,7 @@ bool FindWordBelow(
     if (!GetLine(currentLine, &lineBegin, &lineEnd)) return false;
     searchStart = lineBegin;
 
-    UIUpdate(currentLine, totalLines);
+    if (!UIUpdate(currentLine, totalLines)) return false;
   }
 
   return false;
@@ -272,7 +294,7 @@ bool FindWordAbove(
     if (!GetLine(currentLine, &lineBegin, &lineEnd)) return false;
     searchEnd = lineEnd;
 
-    UIUpdate(totalLines - 1 - currentLine, totalLines);
+    if (!UIUpdate(totalLines - 1 - currentLine, totalLines)) return false;
   }
 
   return false;
