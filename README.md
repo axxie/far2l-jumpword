@@ -28,4 +28,12 @@ Sequence=F11 j 2
 [KeyMacros/Editor/CtrlAltUp]
 DisableOutput=0x0
 Sequence=F11 j 1
+
+[KeyMacros/Editor/CtrlShiftDown]
+DisableOutput=0x0
+Sequence=F11 j 2
+
+[KeyMacros/Editor/CtrlShiftUp]
+DisableOutput=0x0
+Sequence=F11 j 1
 ```
